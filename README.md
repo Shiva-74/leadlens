@@ -10,7 +10,7 @@ LeadLens helps sales teams turn enquiries into structured lead profiles, underst
 
 </p>
 
-## ✨ What it does
+## What it does
 
 | Feature | What you can do |
 |---|---|
@@ -24,7 +24,7 @@ LeadLens helps sales teams turn enquiries into structured lead profiles, underst
 | **Site visits** | Create a Google Calendar link and downloadable `.ics` invite |
 | **Lead chat** | Ask questions grounded in a selected lead's saved information |
 
-## 🔄 How it works
+## How it works
 
 1. **Capture** a customer enquiry.
 2. **Review** the transcript and extracted details.
@@ -32,7 +32,7 @@ LeadLens helps sales teams turn enquiries into structured lead profiles, underst
 4. **Prioritize** the lead in the queue.
 5. **Prepare and debrief** calls, then follow up or schedule a site visit.
 
-## 🎯 Lead scoring
+## Lead scoring
 
 The AI helps interpret the enquiry; the server calculates the final score using fixed weights.
 
@@ -43,13 +43,13 @@ The AI helps interpret the enquiry; the server calculates the final score using 
 | Budget realism | 20% |
 | Requirement fit and clarity | 15% |
 
-- 🔥 **Hot:** 70–100
+- 🔴 **Hot:** 70–100
 - 🟠 **Warm:** 40–69
 - 🔵 **Cold:** 0–39
 
 *These are heuristic weights, not a model trained on historical sales conversions.*
 
-## 🧱 Built with
+## Built with
 
 **Frontend:** React 19 · TypeScript · Vite · Tailwind CSS 4
 
@@ -57,9 +57,12 @@ The AI helps interpret the enquiry; the server calculates the final score using 
 
 **AI & speech:** NVIDIA NIM · Google Gemini · Groq · Groq Whisper (depending on configured keys and availability)
 
-## 🗺️ Architecture
+##  Architecture
 
-```text
+
+## Architecture
+
+```mermaid
 flowchart TB
     subgraph UI["Frontend"]
         A["React · TypeScript · Tailwind CSS"]
@@ -91,7 +94,8 @@ flowchart TB
     E --> H
 ```
 
-## 🚀 Run locally
+
+## Run locally
 
 ### Requirements
 - Node.js 20+
@@ -151,7 +155,7 @@ npm run build
 npm start
 ```
 
-## 📍 Project status
+## Project status
 
 **Core application and lead-management workflows are implemented in the codebase; end-to-end validation depends on your local database and provider configuration.**
 
@@ -163,7 +167,7 @@ Not implemented yet:
 - Production authentication, role-based access, and external CRM sync
 - Automated test suite
 
-## 🔐 Notes on reliability and privacy
+## Notes on reliability and privacy
 
 - Transcripts and lead records are stored in PostgreSQL.
 - Audio uploads are processed in memory for transcription and are not intentionally written to application disk.
@@ -171,7 +175,7 @@ Not implemented yet:
 - Anonymous sessions are intended for a demo, not production access control.
 - AI provider availability and rate limits can affect requests.
 
-## 🛣️ Roadmap
+## Roadmap
 
 - Connect telephony or voice-agent platforms through webhooks
 - Add speaker diarization
@@ -179,11 +183,11 @@ Not implemented yet:
 - Add production authentication, automated tests, and deployment-grade rate limiting
 - Integrate with external CRMs
 
-## 🤝 Contributing
+## Contributing
 
 Issues and pull requests are welcome. For substantial changes, open an issue to discuss the proposal first.
 
-## 📄 License
+## License
 
 No license has been specified yet. Until one is added, reuse is not automatically granted.
 
