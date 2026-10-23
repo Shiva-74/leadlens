@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   ListChecks,
   Users,
@@ -9,6 +10,7 @@ import {
   Menu,
   X,
   PhoneCall,
+  ArrowLeft,
 } from 'lucide-react';
 import { useToast } from '../lib/toast';
 import { Dialog } from './ui';
@@ -30,6 +32,18 @@ export function Layout({
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [clearing, setClearing] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const showBackButton =
+    location.pathname.startsWith('/leads/') || location.pathname === '/new';
+
+  const handleGoBack = () => {
+    if (window.history.length > 2) {
+      navigate(-1);
+    } else {
+      navigate('/queue');
+    }
+  };
+
   const { showToast } = useToast();
 
   const handleClearData = async () => {
@@ -162,6 +176,18 @@ export function Layout({
             >
               <Menu className="w-4 h-4" />
             </button>
+
+            {showBackButton && (
+              <button
+                onClick={handleGoBack}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#E7E5E0] bg-[#F7F7F5] hover:bg-[#EAE8E1] text-xs font-medium text-[#1C1B19] transition cursor-pointer"
+                title="Go back"
+              >
+                <ArrowLeft className="w-3.5 h-3.5 text-[#5F5C55]" />
+                <span>Back</span>
+              </button>
+            )}
+
             <h1 className="text-lg font-semibold text-[#1C1B19] truncate">{title}</h1>
           </div>
 
