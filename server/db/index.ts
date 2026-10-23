@@ -12,6 +12,11 @@ if (!process.env.DATABASE_URL) {
   console.warn('⚠️ DATABASE_URL is not set in .env. Database operations will fail.');
 }
 
+const connectionString = process.env.DATABASE_URL?.replace(
+  /(\?|&)sslmode=[^&]+/i,
+  ''
+);
+
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL?.includes('localhost')
@@ -32,6 +37,7 @@ export async function initDb(): Promise<void> {
         id UUID PRIMARY KEY,
         session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
         name TEXT NOT NULL,
+        phone TEXT NULL,
         location TEXT NOT NULL,
         property_requirement TEXT,
         budget_text TEXT,
@@ -53,6 +59,8 @@ export async function initDb(): Promise<void> {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS phone TEXT NULL;
 
       CREATE TABLE IF NOT EXISTS chat_messages (
         id UUID PRIMARY KEY,

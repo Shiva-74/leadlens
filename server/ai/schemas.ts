@@ -48,6 +48,7 @@ export type SubScores = z.infer<typeof SubScoresSchema>;
 
 export const ExtractionResultSchema = z.object({
   name: z.string().nullable(),
+  phone: z.string().nullable().optional(),
   location: z.string().nullable(),
   property_requirement: z.string().nullable(),
   budget_text: z.string().nullable(),

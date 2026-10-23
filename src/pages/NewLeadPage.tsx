@@ -25,6 +25,7 @@ const TIMELINE_OPTIONS = [
 
 const MESSY_HINGLISH_EXAMPLE = {
   name: 'Nikhil Malhotra',
+  phone: '+91 98450 67890',
   location: 'Whitefield, Bengaluru',
   property_requirement: '3 BHK apartment, ready to move',
   budget_text: '1.25 Cr to 1.35 Cr',
@@ -34,7 +35,7 @@ const MESSY_HINGLISH_EXAMPLE = {
 };
 
 const SAMPLE_VOICE_TRANSCRIPT =
-  'Spoke with Mrs. Kavita Nair at the property expo. Unko Gachibowli ya Kokapet Hyderabad mein 3 BHK flat chahiye, around 1800 sq ft. Budget bol rahe the 1.45 se 1.60 crore ke beech mein. Husband IT mein hain, SBI home loan lenge. Unka lease agle do mahine mein khatam ho raha hai so within 1 to 3 months shift karna chahte hain. Main concern hai ki society mein kids play area aur 100% power backup hona chahiye, aur RERA registered project hi dekhenge. Saturday shaam 4 baje site visit ke liye bola hai.';
+  'Spoke with Mrs. Kavita Nair at the property expo, her number is 98490 55443. Unko Gachibowli ya Kokapet Hyderabad mein 3 BHK flat chahiye, around 1800 sq ft. Budget bol rahe the 1.45 se 1.60 crore ke beech mein. Husband IT mein hain, SBI home loan lenge. Unka lease agle do mahine mein khatam ho raha hai so within 1 to 3 months shift karna chahte hain. Main concern hai ki society mein kids play area aur 100% power backup hona chahiye, aur RERA registered project hi dekhenge. Saturday shaam 4 baje site visit ke liye bola hai.';
 
 export function NewLeadPage({ onLeadCreated }: { onLeadCreated?: () => void }) {
   const [activeTab, setActiveTab] = useState<'form' | 'paste' | 'voice'>('form');
@@ -43,6 +44,7 @@ export function NewLeadPage({ onLeadCreated }: { onLeadCreated?: () => void }) {
 
   // Form fields
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
   const [location, setLocation] = useState('');
   const [propertyRequirement, setPropertyRequirement] = useState('');
   const [budgetText, setBudgetText] = useState('');
@@ -66,6 +68,7 @@ export function NewLeadPage({ onLeadCreated }: { onLeadCreated?: () => void }) {
 
   const fillExample = () => {
     setName(MESSY_HINGLISH_EXAMPLE.name);
+    setPhone(MESSY_HINGLISH_EXAMPLE.phone);
     setLocation(MESSY_HINGLISH_EXAMPLE.location);
     setPropertyRequirement(MESSY_HINGLISH_EXAMPLE.property_requirement);
     setBudgetText(MESSY_HINGLISH_EXAMPLE.budget_text);
@@ -99,6 +102,8 @@ export function NewLeadPage({ onLeadCreated }: { onLeadCreated?: () => void }) {
 
       setName(data.name || '');
       if (!data.name) confirmMap.name = true;
+
+      setPhone(data.phone || '');
 
       setLocation(data.location || '');
       if (!data.location) confirmMap.location = true;
@@ -152,6 +157,7 @@ export function NewLeadPage({ onLeadCreated }: { onLeadCreated?: () => void }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: name.trim(),
+          phone: phone.trim() || null,
           location: location.trim(),
           property_requirement: propertyRequirement.trim() || null,
           budget_text: budgetText.trim() || null,
@@ -261,7 +267,7 @@ export function NewLeadPage({ onLeadCreated }: { onLeadCreated?: () => void }) {
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-semibold text-[#1C1B19] mb-1">
                 Name <span className="text-[#B42318]">*</span>
@@ -282,6 +288,19 @@ export function NewLeadPage({ onLeadCreated }: { onLeadCreated?: () => void }) {
                   <AlertCircle className="w-3.5 h-3.5" /> {errors.name}
                 </p>
               )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-[#1C1B19] mb-1">
+                Phone <span className="text-[#8C8980] font-normal">(optional, for WhatsApp)</span>
+              </label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+91 98450 12345"
+                className="w-full px-3 py-2 rounded-lg border border-[#E7E5E0] bg-white text-sm text-[#1C1B19]"
+              />
             </div>
 
             <div>
@@ -400,7 +419,7 @@ export function NewLeadPage({ onLeadCreated }: { onLeadCreated?: () => void }) {
           <div>
             <h2 className="text-base font-semibold text-[#1C1B19]">Paste a call transcript or WhatsApp chat</h2>
             <p className="text-xs text-[#5F5C55]">
-              We will extract the buyer's name, location, budget, requirement, and timeline into the form so you can verify before scoring.
+              We will extract the buyer's name, phone, location, budget, requirement, and timeline into the form so you can verify before scoring.
             </p>
           </div>
 
@@ -408,7 +427,7 @@ export function NewLeadPage({ onLeadCreated }: { onLeadCreated?: () => void }) {
             rows={7}
             value={pastedText}
             onChange={(e) => setPastedText(e.target.value)}
-            placeholder="Example: Spoke to Sneha Patil from Pune. Looking for 2 BHK in Baner or Pashan around 90 lakhs, shifting in 2 months..."
+            placeholder="Example: Spoke to Sneha Patil (98220 11223) from Pune. Looking for 2 BHK in Baner or Pashan around 90 lakhs, shifting in 2 months..."
             className="w-full px-3 py-2.5 rounded-lg border border-[#E7E5E0] bg-white text-sm text-[#1C1B19]"
           />
 

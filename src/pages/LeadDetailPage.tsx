@@ -26,9 +26,12 @@ import {
   Sparkles,
   Clock,
   FileText,
+  CalendarPlus,
+  ExternalLink,
+  Download,
 } from 'lucide-react';
 import { Lead, ChatMessage, CallEvent, CallBrief, LeadStatus } from '../lib/types';
-import { PriorityBadge, ScoreRing, ScoreBar, Skeleton } from '../components/ui';
+import { PriorityBadge, ScoreRing, ScoreBar, Skeleton, Dialog } from '../components/ui';
 import { VoiceRecorder } from '../components/VoiceRecorder';
 import {
   formatBudgetRange,
@@ -36,6 +39,12 @@ import {
   formatRelativeDate,
   formatTimestamp,
 } from '../lib/format';
+import {
+  buildWhatsAppUrl,
+  buildGoogleCalendarUrl,
+  downloadSiteVisitIcs,
+  buildSiteVisitConfirmationMessage,
+} from '../lib/actions';
 import { useToast } from '../lib/toast';
 
 const QUICK_PROMPTS = [
@@ -55,6 +64,12 @@ const REWRITE_STYLES = [
   { label: 'Hindi', instruction: 'Rewrite the suggested response in polite conversational Hindi (Roman script).' },
 ];
 
+function getDefaultVisitDateString(): string {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return tomorrow.toISOString().split('T')[0];
+}
+
 export function LeadDetailPage({ onLeadUpdated }: { onLeadUpdated?: () => void }) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -63,6 +78,16 @@ export function LeadDetailPage({ onLeadUpdated }: { onLeadUpdated?: () => void }
   const [lead, setLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(true);
   const [retryingAnalysis, setRetryingAnalysis] = useState(false);
+
+  // Inline phone edit state
+  const [editingPhone, setEditingPhone] = useState(false);
+  const [phoneDraft, setPhoneDraft] = useState('');
+
+  // Site Visit Scheduler Dialog state
+  const [visitDialogOpen, setVisitDialogOpen] = useState(false);
+  const [visitDate, setVisitDate] = useState(getDefaultVisitDateString);
+  const [visitTime, setVisitTime] = useState('11:00');
+  const [visitMeetingPoint, setVisitMeetingPoint] = useState('');
 
   // Mobile view switcher ('analysis' | 'workspace')
   const [mobileSection, setMobileSection] = useState<'analysis' | 'workspace'>('analysis');
@@ -116,6 +141,8 @@ export function LeadDetailPage({ onLeadUpdated }: { onLeadUpdated?: () => void }
 
       const leadData = await leadRes.json();
       setLead(leadData.lead);
+      setPhoneDraft(leadData.lead.phone || '');
+      setVisitMeetingPoint(leadData.lead.location || '');
       setDisplayedReply(leadData.lead.analysis?.suggested_response || '');
 
       if (chatRes.ok) {
@@ -164,6 +191,25 @@ export function LeadDetailPage({ onLeadUpdated }: { onLeadUpdated?: () => void }
       }
     } catch {
       showToast('Could not update status', 'error');
+    }
+  };
+
+  const handleSavePhone = async () => {
+    if (!lead) return;
+    try {
+      const res = await fetch(`/api/leads/${lead.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phoneDraft.trim() || null }),
+      });
+      const data = await res.json();
+      if (res.ok && data.lead) {
+        setLead(data.lead);
+        setEditingPhone(false);
+        showToast('Phone number saved', 'success');
+      }
+    } catch {
+      showToast('Could not save phone number', 'error');
     }
   };
 
@@ -229,7 +275,6 @@ export function LeadDetailPage({ onLeadUpdated }: { onLeadUpdated?: () => void }
       if (!res.ok) throw new Error(data.error || 'Rewrite failed');
 
       setDisplayedReply(data.message.content);
-      // Also append to chat history
       const chatRes = await fetch(`/api/leads/${lead.id}/chat`);
       if (chatRes.ok) {
         const chatData = await chatRes.json();
@@ -250,7 +295,6 @@ export function LeadDetailPage({ onLeadUpdated }: { onLeadUpdated?: () => void }
     setFailedChatInput(null);
     setSendingChat(true);
 
-    // Optimistic user bubble
     const tempUserMsg: ChatMessage = {
       id: `temp-${Date.now()}`,
       lead_id: lead.id,
@@ -369,7 +413,6 @@ export function LeadDetailPage({ onLeadUpdated }: { onLeadUpdated?: () => void }
   const analysis = lead.analysis;
   const subScores = lead.sub_scores || analysis?.sub_scores;
 
-  // Build score history list from debrief events (oldest to newest)
   const debriefEventsChronological = [...callEvents]
     .filter((e) => e.type === 'debrief')
     .reverse();
@@ -386,6 +429,13 @@ export function LeadDetailPage({ onLeadUpdated }: { onLeadUpdated?: () => void }
         return <Phone className="w-4 h-4 text-[#0F766E]" />;
     }
   };
+
+  const siteVisitConfirmationText = buildSiteVisitConfirmationMessage({
+    lead,
+    dateStr: visitDate,
+    timeStr: visitTime,
+    meetingPoint: visitMeetingPoint,
+  });
 
   return (
     <div>
@@ -438,16 +488,58 @@ export function LeadDetailPage({ onLeadUpdated }: { onLeadUpdated?: () => void }
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-[#5F5C55] flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-[#8C8980]" />
-                    <span>{lead.location}</span>
+
+                  <div className="text-xs text-[#5F5C55] flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="inline-flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5 text-[#8C8980]" />
+                      {lead.location}
+                    </span>
+                    <span>·</span>
+                    {!editingPhone ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPhoneDraft(lead.phone || '');
+                          setEditingPhone(true);
+                        }}
+                        className="inline-flex items-center gap-1 text-[#0F766E] hover:underline cursor-pointer"
+                        title="Click to edit phone number for WhatsApp"
+                      >
+                        <Phone className="w-3 h-3" />
+                        <span>{lead.phone || 'Add phone number'}</span>
+                      </button>
+                    ) : (
+                      <span className="inline-flex items-center gap-1">
+                        <input
+                          type="tel"
+                          value={phoneDraft}
+                          onChange={(e) => setPhoneDraft(e.target.value)}
+                          placeholder="+91 98450 12345"
+                          className="px-2 py-0.5 rounded border border-[#E7E5E0] text-xs text-[#1C1B19] w-36"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSavePhone}
+                          className="px-2 py-0.5 rounded bg-[#0F766E] text-white text-[11px] font-medium cursor-pointer"
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingPhone(false)}
+                          className="text-[11px] text-[#8C8980] hover:text-[#1C1B19] cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </span>
+                    )}
                     {lead.follow_up_date && (
                       <>
                         <span>·</span>
                         <span>Follow-up: {formatRelativeDate(lead.follow_up_date)}</span>
                       </>
                     )}
-                  </p>
+                  </div>
                 </div>
               </div>
 
@@ -554,7 +646,7 @@ export function LeadDetailPage({ onLeadUpdated }: { onLeadUpdated?: () => void }
                 </div>
               </div>
 
-              {/* 4. RECOMMENDED NEXT ACTION (Prominent soft teal card #E6F2F0) */}
+              {/* 4. RECOMMENDED NEXT ACTION + SCHEDULE SITE VISIT BUTTON */}
               <div className="rounded-[10px] bg-[#E6F2F0] border border-[#0F766E]/30 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 rounded-lg bg-white border border-[#0F766E]/20 flex items-center justify-center shrink-0 mt-0.5">
@@ -574,9 +666,18 @@ export function LeadDetailPage({ onLeadUpdated }: { onLeadUpdated?: () => void }
                     </p>
                   </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => setVisitDialogOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#0F766E] hover:bg-[#0D6560] text-white text-xs font-medium transition shrink-0 self-start sm:self-center cursor-pointer"
+                >
+                  <CalendarPlus className="w-3.5 h-3.5" />
+                  <span>Schedule site visit</span>
+                </button>
               </div>
 
-              {/* 5. SUGGESTED RESPONSE */}
+              {/* 5. SUGGESTED RESPONSE + ONE-TAP OPEN WHATSAPP */}
               <div className="card-surface p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                   <div className="flex items-center gap-2">
@@ -584,7 +685,24 @@ export function LeadDetailPage({ onLeadUpdated }: { onLeadUpdated?: () => void }
                     <h3 className="text-sm font-semibold text-[#1C1B19]">Suggested response</h3>
                   </div>
 
-                  <div className="flex items-center gap-2 relative">
+                  <div className="flex flex-wrap items-center gap-2 relative">
+                    {/* ONE-TAP WHATSAPP LINK */}
+                    <a
+                      href={buildWhatsAppUrl(lead.phone, displayedReply)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#0F766E] hover:bg-[#0D6560] text-white text-xs font-medium transition cursor-pointer"
+                      title={
+                        lead.phone
+                          ? `Open WhatsApp chat with ${lead.phone}`
+                          : 'Open WhatsApp with prefilled reply'
+                      }
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      <span>Open WhatsApp</span>
+                      <ExternalLink className="w-3 h-3 opacity-80" />
+                    </a>
+
                     <button
                       onClick={() => {
                         copyText(displayedReply, 'Response copied');
@@ -705,7 +823,6 @@ export function LeadDetailPage({ onLeadUpdated }: { onLeadUpdated?: () => void }
 
               {/* 6. TWO COLUMNS: KEY REQUIREMENTS & OBJECTIONS */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Key Requirements */}
                 <div className="card-surface p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <CheckCircle2 className="w-4 h-4 text-[#0F766E]" />
@@ -723,7 +840,6 @@ export function LeadDetailPage({ onLeadUpdated }: { onLeadUpdated?: () => void }
                   </ul>
                 </div>
 
-                {/* Objections and Concerns */}
                 <div className="card-surface p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <AlertTriangle className="w-4 h-4 text-[#B54708]" />
@@ -867,7 +983,6 @@ export function LeadDetailPage({ onLeadUpdated }: { onLeadUpdated?: () => void }
           }`}
         >
           <div className="card-surface overflow-hidden flex flex-col">
-            {/* Tab Header */}
             <div className="grid grid-cols-2 border-b border-[#E7E5E0] bg-[#F7F7F5] no-print">
               <button
                 onClick={() => setRightTab('assistant')}
@@ -891,9 +1006,7 @@ export function LeadDetailPage({ onLeadUpdated }: { onLeadUpdated?: () => void }
               </button>
             </div>
 
-            {/* ==========================================
-                TAB A: GROUNDED ASSISTANT
-            ========================================== */}
+            {/* TAB A: GROUNDED ASSISTANT */}
             {rightTab === 'assistant' && (
               <div className="flex flex-col h-[580px] no-print">
                 <div className="px-4 py-2 bg-[#F7F7F5]/60 border-b border-[#E7E5E0] flex items-center justify-between">
@@ -910,7 +1023,6 @@ export function LeadDetailPage({ onLeadUpdated }: { onLeadUpdated?: () => void }
                   )}
                 </div>
 
-                {/* Messages Area */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
                   {messages.length === 0 && (
                     <div className="text-center py-6 space-y-3">
@@ -988,7 +1100,6 @@ export function LeadDetailPage({ onLeadUpdated }: { onLeadUpdated?: () => void }
                   <div ref={chatEndRef} />
                 </div>
 
-                {/* Quick chips when conversation is active */}
                 {messages.length > 0 && (
                   <div className="px-3 py-1.5 border-t border-[#E7E5E0] flex gap-1.5 overflow-x-auto bg-[#F7F7F5]/50">
                     {QUICK_PROMPTS.map((q) => (
@@ -1004,7 +1115,6 @@ export function LeadDetailPage({ onLeadUpdated }: { onLeadUpdated?: () => void }
                   </div>
                 )}
 
-                {/* Input Box */}
                 <div className="p-3 border-t border-[#E7E5E0] bg-white flex items-end gap-2">
                   <textarea
                     rows={2}
@@ -1031,9 +1141,7 @@ export function LeadDetailPage({ onLeadUpdated }: { onLeadUpdated?: () => void }
               </div>
             )}
 
-            {/* ==========================================
-                TAB B: VOICE-FIRST CALL LOOP
-            ========================================== */}
+            {/* TAB B: VOICE-FIRST CALL LOOP */}
             {rightTab === 'call_loop' && (
               <div className="p-4 space-y-6 max-h-[750px] overflow-y-auto">
                 {/* STAGE 1: BEFORE THE CALL */}
@@ -1258,17 +1366,30 @@ export function LeadDetailPage({ onLeadUpdated }: { onLeadUpdated?: () => void }
                             <span className="font-semibold text-[#1C1B19]">
                               Follow-up message:
                             </span>
-                            <button
-                              onClick={() =>
-                                copyText(
-                                  lastDebriefResult.follow_up_message,
-                                  'Follow-up message copied'
-                                )
-                              }
-                              className="inline-flex items-center gap-1 text-[#0F766E] font-semibold cursor-pointer"
-                            >
-                              <Copy className="w-3 h-3" /> Copy
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <a
+                                href={buildWhatsAppUrl(
+                                  lead.phone,
+                                  lastDebriefResult.follow_up_message
+                                )}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[#0F766E] font-semibold hover:underline"
+                              >
+                                <MessageCircle className="w-3 h-3" /> WhatsApp
+                              </a>
+                              <button
+                                onClick={() =>
+                                  copyText(
+                                    lastDebriefResult.follow_up_message,
+                                    'Follow-up message copied'
+                                  )
+                                }
+                                className="inline-flex items-center gap-1 text-[#0F766E] font-semibold cursor-pointer"
+                              >
+                                <Copy className="w-3 h-3" /> Copy
+                              </button>
+                            </div>
                           </div>
                           <div className="bg-white p-2.5 rounded border border-[#E7E5E0] text-[#1C1B19] whitespace-pre-wrap">
                             {lastDebriefResult.follow_up_message}
@@ -1323,6 +1444,123 @@ export function LeadDetailPage({ onLeadUpdated }: { onLeadUpdated?: () => void }
           </div>
         </div>
       </div>
+
+      {/* ============================================================
+          SCHEDULE SITE VISIT DIALOG
+      ============================================================ */}
+      <Dialog
+        open={visitDialogOpen}
+        onClose={() => setVisitDialogOpen(false)}
+        title={`Schedule Site Visit — ${lead.name}`}
+      >
+        <div className="space-y-4 text-xs text-[#1C1B19]">
+          <p className="text-[#5F5C55]">
+            Pick a date and time to generate a Google Calendar event, a downloadable{' '}
+            <code>.ics</code> calendar invite, and a WhatsApp confirmation message for the customer.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block font-semibold mb-1">Visit Date</label>
+              <input
+                type="date"
+                value={visitDate}
+                onChange={(e) => setVisitDate(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-[#E7E5E0] bg-white text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block font-semibold mb-1">Visit Time</label>
+              <input
+                type="time"
+                value={visitTime}
+                onChange={(e) => setVisitTime(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-[#E7E5E0] bg-white text-sm"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block font-semibold mb-1">Project / Meeting Location</label>
+            <input
+              type="text"
+              value={visitMeetingPoint}
+              onChange={(e) => setVisitMeetingPoint(e.target.value)}
+              placeholder={lead.location}
+              className="w-full px-3 py-2 rounded-lg border border-[#E7E5E0] bg-white text-sm"
+            />
+          </div>
+
+          {/* Calendar Actions */}
+          <div className="flex flex-wrap items-center gap-2.5 pt-1">
+            <a
+              href={buildGoogleCalendarUrl({
+                lead,
+                dateStr: visitDate,
+                timeStr: visitTime,
+                meetingPoint: visitMeetingPoint,
+              })}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#0F766E] hover:bg-[#0D6560] text-white font-semibold transition cursor-pointer"
+            >
+              <CalendarPlus className="w-4 h-4" />
+              <span>Open in Google Calendar</span>
+              <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+            </a>
+
+            <button
+              type="button"
+              onClick={() => {
+                downloadSiteVisitIcs({
+                  lead,
+                  dateStr: visitDate,
+                  timeStr: visitTime,
+                  meetingPoint: visitMeetingPoint,
+                });
+                showToast('Downloaded .ics calendar file', 'success');
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-[#E7E5E0] bg-white hover:bg-[#F7F7F5] text-[#1C1B19] font-semibold transition cursor-pointer"
+            >
+              <Download className="w-4 h-4 text-[#0F766E]" />
+              <span>Download .ics file</span>
+            </button>
+          </div>
+
+          {/* Drafted Confirmation Message */}
+          <div className="pt-3 border-t border-[#E7E5E0] space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-[#1C1B19]">
+                Drafted confirmation message for {lead.name}:
+              </span>
+              <div className="flex items-center gap-2">
+                <a
+                  href={buildWhatsAppUrl(lead.phone, siteVisitConfirmationText)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[#E6F2F0] text-[#0F766E] font-semibold hover:bg-[#0F766E] hover:text-white transition"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  <span>Send on WhatsApp</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => copyText(siteVisitConfirmationText, 'Confirmation copied')}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded border border-[#E7E5E0] bg-white hover:bg-[#F7F7F5] font-medium cursor-pointer"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Copy</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-[#F7F7F5] border border-[#E7E5E0] rounded-lg p-3 text-xs text-[#1C1B19] leading-relaxed">
+              {siteVisitConfirmationText}
+            </div>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }

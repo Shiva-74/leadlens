@@ -1,5 +1,6 @@
 export interface SeedLeadInput {
   name: string;
+  phone: string;
   location: string;
   property_requirement: string;
   budget_text: string;
@@ -12,6 +13,7 @@ export const SAMPLE_LEADS: SeedLeadInput[] = [
   // 1) Hot Hinglish WhatsApp lead, exact budget, site-visit date
   {
     name: 'Rohit Verma',
+    phone: '+91 98450 11223',
     location: 'Whitefield, Bengaluru',
     property_requirement: '3 BHK Apartment, Ready to Move',
     budget_text: '1.35 Cr',
@@ -24,6 +26,7 @@ export const SAMPLE_LEADS: SeedLeadInput[] = [
   // 2) Rambling English email from an investor asking about rental yield
   {
     name: 'Vikramaditya Nair',
+    phone: '+91 98490 44556',
     location: 'Gachibowli, Hyderabad',
     property_requirement: '2 BHK investment unit in gated society',
     budget_text: '95 Lakhs to 1.1 Cr',
@@ -36,6 +39,7 @@ export const SAMPLE_LEADS: SeedLeadInput[] = [
   // 3) Vague 'just checking prices' lead, huge budget, no intent or timeline
   {
     name: 'Karanveer Singhania',
+    phone: '+91 98201 77889',
     location: 'Worli, Mumbai',
     property_requirement: '4 BHK Sea View or Penthouse',
     budget_text: '12 Cr',
@@ -48,6 +52,7 @@ export const SAMPLE_LEADS: SeedLeadInput[] = [
   // 4) Unrealistic budget for the stated area
   {
     name: 'Sandeep Kulkarni',
+    phone: '+91 98215 33441',
     location: 'Powai, Mumbai',
     property_requirement: '3 BHK with balcony and 2 car parking in new tower',
     budget_text: '65 Lakhs',
@@ -60,6 +65,7 @@ export const SAMPLE_LEADS: SeedLeadInput[] = [
   // 5) Conflicting form and message (form says 2 BHK, message says 3 BHK)
   {
     name: 'Priya Deshmukh',
+    phone: '+91 98220 99001',
     location: 'Wakad, Pune',
     property_requirement: '2 BHK Apartment',
     budget_text: '85 Lakhs',
@@ -72,6 +78,7 @@ export const SAMPLE_LEADS: SeedLeadInput[] = [
   // 6) Worried about RERA registration and home-loan approval
   {
     name: 'Ananya Chatterjee',
+    phone: '+91 98802 55667',
     location: 'Sarjapur Road, Bengaluru',
     property_requirement: '2.5 or 3 BHK under construction',
     budget_text: '1.15 Cr',
@@ -84,6 +91,7 @@ export const SAMPLE_LEADS: SeedLeadInput[] = [
   // 7) NRI buying for parents, formal English
   {
     name: 'Arjun & Meera Krishnan',
+    phone: '+91 98230 66778',
     location: 'Kalyani Nagar, Pune',
     property_requirement: '3 BHK senior-friendly low floor apartment',
     budget_text: '1.6 Cr to 1.8 Cr',
@@ -96,6 +104,7 @@ export const SAMPLE_LEADS: SeedLeadInput[] = [
   // 8) Nearly empty one-line message
   {
     name: 'Deepak Yadav',
+    phone: '+91 97650 12345',
     location: 'Hinjewadi, Pune',
     property_requirement: '2 BHK',
     budget_text: '',

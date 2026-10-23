@@ -69,6 +69,7 @@ export const EXTRACTION_SYSTEM_PROMPT = `Extract the lead form fields from a pas
 Output ONLY valid JSON with this exact shape:
 {
   "name": "string or null",
+  "phone": "string or null",
   "location": "string or null",
   "property_requirement": "string or null",
   "budget_text": "string or null",

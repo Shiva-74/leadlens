@@ -140,6 +140,7 @@ apiRouter.post('/extract', async (req: Request, res: Response) => {
 // ==========================================
 const CreateLeadSchema = z.object({
   name: z.string().min(1, 'Name is required'),
+  phone: z.string().optional().nullable(),
   location: z.string().min(1, 'Location is required'),
   property_requirement: z.string().optional().nullable(),
   budget_text: z.string().optional().nullable(),
@@ -164,19 +165,20 @@ apiRouter.post('/leads', async (req: Request, res: Response) => {
   }
 
   const leadId = crypto.randomUUID();
-  const { name, location, property_requirement, budget_text, timeline, customer_message, source } =
+  const { name, phone, location, property_requirement, budget_text, timeline, customer_message, source } =
     parsed.data;
 
   try {
     // Save initially with analysis_status = 'pending'
     await pool.query(
       `INSERT INTO leads (
-        id, session_id, name, location, property_requirement, budget_text, timeline, customer_message, source, status, analysis_status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'new', 'pending')`,
+        id, session_id, name, phone, location, property_requirement, budget_text, timeline, customer_message, source, status, analysis_status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'new', 'pending')`,
       [
         leadId,
         req.sessionId,
         name.trim(),
+        phone?.trim() || null,
         location.trim(),
         property_requirement?.trim() || null,
         budget_text?.trim() || null,
@@ -477,12 +479,13 @@ apiRouter.get('/leads/:id', async (req: Request, res: Response) => {
 const PatchLeadSchema = z.object({
   status: z.enum(['new', 'contacted', 'follow_up', 'won', 'lost']).optional(),
   follow_up_date: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
 });
 
 apiRouter.patch('/leads/:id', async (req: Request, res: Response) => {
   const parsed = PatchLeadSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid status or follow_up_date update.' });
+    return res.status(400).json({ error: 'Invalid update payload.' });
   }
 
   try {
@@ -500,11 +503,15 @@ apiRouter.patch('/leads/:id', async (req: Request, res: Response) => {
       parsed.data.follow_up_date !== undefined
         ? parsed.data.follow_up_date
         : current.follow_up_date;
+    const newPhone =
+      parsed.data.phone !== undefined
+        ? parsed.data.phone?.trim() || null
+        : current.phone;
 
     const updated = await pool.query(
-      `UPDATE leads SET status = $1, follow_up_date = $2, updated_at = NOW()
-       WHERE id = $3 AND session_id = $4 RETURNING *`,
-      [newStatus, newFollowUp, req.params.id, req.sessionId]
+      `UPDATE leads SET status = $1, follow_up_date = $2, phone = $3, updated_at = NOW()
+       WHERE id = $4 AND session_id = $5 RETURNING *`,
+      [newStatus, newFollowUp, newPhone, req.params.id, req.sessionId]
     );
 
     return res.json({ lead: enrichLeadRow(updated.rows[0]) });
@@ -874,32 +881,42 @@ apiRouter.get('/leads/:id/calls', async (req: Request, res: Response) => {
 // ==========================================
 apiRouter.post('/sample-leads', async (req: Request, res: Response) => {
   try {
-    // Idempotent per session: check if sample leads already exist
     const existingSamples = await pool.query(
       `SELECT * FROM leads WHERE session_id = $1 AND source = 'sample' ORDER BY created_at ASC`,
       [req.sessionId]
     );
 
     if (existingSamples.rowCount && existingSamples.rowCount > 0) {
+      // Backfill phone numbers on existing sample leads if missing
+      for (const item of SAMPLE_LEADS) {
+        await pool.query(
+          `UPDATE leads SET phone = $1 WHERE session_id = $2 AND source = 'sample' AND name = $3 AND phone IS NULL`,
+          [item.phone, req.sessionId, item.name]
+        );
+      }
+      const refreshed = await pool.query(
+        `SELECT * FROM leads WHERE session_id = $1 AND source = 'sample' ORDER BY created_at ASC`,
+        [req.sessionId]
+      );
       return res.json({
-        leads: existingSamples.rows.map(enrichLeadRow),
+        leads: refreshed.rows.map(enrichLeadRow),
         alreadyLoaded: true,
       });
     }
 
-    // Insert all 8 leads as 'pending' first so the frontend can show progress or analyze in batches
     const createdLeads: any[] = [];
     for (const item of SAMPLE_LEADS) {
       const id = crypto.randomUUID();
       const inserted = await pool.query(
         `INSERT INTO leads (
-          id, session_id, name, location, property_requirement, budget_text, timeline, customer_message, source, status, analysis_status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'sample', 'new', 'pending')
+          id, session_id, name, phone, location, property_requirement, budget_text, timeline, customer_message, source, status, analysis_status
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'sample', 'new', 'pending')
         RETURNING *`,
         [
           id,
           req.sessionId,
           item.name,
+          item.phone,
           item.location,
           item.property_requirement,
           item.budget_text,

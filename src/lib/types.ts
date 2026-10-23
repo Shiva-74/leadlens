@@ -54,6 +54,7 @@ export interface Lead {
   id: string;
   session_id: string;
   name: string;
+  phone: string | null;
   location: string;
   property_requirement: string | null;
   budget_text: string | null;
